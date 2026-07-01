@@ -1,0 +1,15 @@
+Hybrid Model Results
+====================
+
+Accuracy: 0.9533678756476683
+Precision: 0.9333333333333333
+Recall: 0.937799043062201
+F1 Score: 0.9355608591885441
+Balanced Accuracy: 0.9499806026121815
+MCC: 0.8990316130276963
+ROC-AUC: 0.9863571705676969
+Error Rate: 0.04663212435233166
+
+Confusion Matrix:
+[[356, 14],
+ [13, 196]]
