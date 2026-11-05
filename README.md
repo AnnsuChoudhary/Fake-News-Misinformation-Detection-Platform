@@ -1,47 +1,42 @@
 # Fake News & Misinformation Detection Platform
 
-This repository now includes a full-stack scaffold for serving the trained fake-news detection models through a FastAPI backend and a React/Vite frontend.
+This repository includes a FastAPI backend and a React/Vite frontend for fake-news detection.
 
 ## What is included
 - FastAPI backend under [backend](backend) with endpoints for content, propagation, hybrid, and combined analysis.
-- React/Vite frontend under [frontend](frontend) with a polished single-page experience and environment-based API configuration.
+- React/Vite frontend under [frontend](frontend), with local API calls proxied through Vite and `VITE_API_URL` available for deployment.
 - Deployment configuration for Render and Netlify/Vercel.
 
-## Backend
+## Model availability
 
-### Local setup
+The included `gnn_propagation_model.pth` supports propagation analysis. Content and hybrid analysis also require the trained `pheme_distilbert_model/` directory (or a compatible content checkpoint), which is not included in this repository. The API health endpoint reports which models are available, and the frontend disables modes that cannot run.
+
+## Run locally
+
+Install dependencies once from the repository root:
 ```bash
-cd backend
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### Run the API
-```bash
-cd backend
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### Environment variables
-Copy [backend/.env.example](backend/.env.example) if you need to override the default frontend origin.
-
-## Frontend
-
-### Local setup
-```bash
+pip install -r backend/requirements.txt
 cd frontend
 npm install
-cp .env.example .env
 ```
 
-### Run the UI
+Whenever you reopen the project, start the backend in one terminal from the repository root:
+```bash
+source .venv/bin/activate
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+```
+
+Start the frontend in a second terminal:
 ```bash
 cd frontend
-npm run dev
+npm run dev -- --host 0.0.0.0
 ```
 
-The UI uses the VITE_API_URL variable from [frontend/.env](frontend/.env) and calls the backend at the configured URL.
+In VS Code, open port `5173` from the **Ports** tab. Keep both terminals running while using the app. Vite proxies local API requests to port `8000`.
+
+During local development, the Vite server proxies API requests to `http://127.0.0.1:8000`. For a deployed frontend, set `VITE_API_URL` to the backend's public URL.
 
 ## Deployment
 ### Render (backend)
@@ -56,6 +51,4 @@ The UI uses the VITE_API_URL variable from [frontend/.env](frontend/.env) and ca
 3. Set the publish directory to `dist`.
 4. Configure the `VITE_API_URL` environment variable to your deployed backend URL.
 
-## Notes
-- The scaffold loads the provided model checkpoints rather than retraining them.
-- If a model file is missing or cannot be loaded, the backend returns a clear error response instead of crashing.
+The backend reports missing or unloadable checkpoints in `/health` and returns a clear error response if an unavailable prediction mode is requested directly.

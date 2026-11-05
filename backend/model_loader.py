@@ -82,10 +82,30 @@ class ModelRegistry:
         self.content_model, self.content_tokenizer, self.content_error = self._load_content_model()
         self.propagation_model, self.propagation_error = self._load_propagation_model()
         self.hybrid_model, self.hybrid_error = self._load_hybrid_model()
+        return self.model_status()
+
+    def model_status(self) -> Dict[str, Any]:
+        content_ready = self.content_model is not None and self.content_error is None
+        propagation_ready = self.propagation_model is not None and self.propagation_error is None
+        hybrid_ready = self.hybrid_model is not None and self.hybrid_error is None and content_ready and propagation_ready
+        hybrid_error = self.hybrid_error
+        if hybrid_error is None and not hybrid_ready:
+            hybrid_error = "hybrid inference requires the content, propagation, and fusion models to be available"
         return {
-            "content": self.content_error is None,
-            "propagation": self.propagation_error is None,
-            "hybrid": self.hybrid_error is None,
+            "models": {
+                "content": content_ready,
+                "propagation": propagation_ready,
+                "hybrid": hybrid_ready,
+            },
+            "errors": {
+                name: error
+                for name, error in (
+                    ("content", self.content_error),
+                    ("propagation", self.propagation_error),
+                    ("hybrid", hybrid_error),
+                )
+                if error is not None
+            },
             "device": str(self.device),
         }
 
@@ -102,12 +122,18 @@ class ModelRegistry:
         if DistilBertForSequenceClassification is None or DistilBertTokenizer is None:
             return None, None, "transformers is not installed"
 
-        model_path = self._resolve_model_path("content_analysis_model.pth", "content_model.pth", "distilbert_model.pth")
+        model_path = self._resolve_model_path(
+            "content_analysis_model.pth",
+            "content_model.pth",
+            "distilbert_model.pth",
+            "pheme_distilbert_model",
+        )
         if model_path is None:
-            return None, None, "content model checkpoint was not found; expected one of: content_analysis_model.pth, content_model.pth"
+            return None, None, "content model checkpoint was not found; expected content_analysis_model.pth, content_model.pth, or pheme_distilbert_model/"
 
         try:
-            tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
+            tokenizer_path = str(model_path) if model_path.is_dir() else "distilbert-base-uncased"
+            tokenizer = DistilBertTokenizer.from_pretrained(tokenizer_path)
         except Exception as exc:  # pragma: no cover - network may be unavailable
             return None, None, f"could not download DistilBERT tokenizer: {exc}"
 

@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 const modes = ['content', 'propagation', 'hybrid'];
 
@@ -12,20 +12,48 @@ function getBadgeTone(label) {
 }
 
 function App() {
-  const [mode, setMode] = useState('hybrid');
+  const [mode, setMode] = useState('propagation');
   const [text, setText] = useState('');
   const [graphJson, setGraphJson] = useState('{\n  "nodes": [{"id": 0}, {"id": 1}],\n  "edges": [[0, 1]]\n}');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
+  const [apiStatus, setApiStatus] = useState('checking');
+  const [models, setModels] = useState(null);
+  const [modelErrors, setModelErrors] = useState({});
+
+  useEffect(() => {
+    let active = true;
+
+    async function checkApi() {
+      try {
+        const response = await fetch(`${API_URL}/health`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || 'Backend health check failed');
+        if (active) {
+          setModels(data.models || {});
+          setModelErrors(data.errors || {});
+          setApiStatus('online');
+        }
+      } catch {
+        if (active) setApiStatus('offline');
+      }
+    }
+
+    checkApi();
+    const retryTimer = window.setInterval(checkApi, 5000);
+
+    return () => {
+      active = false;
+      window.clearInterval(retryTimer);
+    };
+  }, []);
 
   const chartData = useMemo(() => {
     if (!result) return [];
 
-    const models = ['content', 'propagation', 'hybrid'];
-    return models.map((name) => {
-      const entry = result?.[name] || result;
+    return Object.entries(result).map(([name, entry]) => {
       const confidence = entry?.confidence ?? 0;
       return { name: name.toUpperCase(), confidence };
     });
@@ -37,57 +65,48 @@ function App() {
     setResult(null);
 
     try {
-      let payload = { text };
-      let endpoint = '/predict/hybrid';
+      const endpoints = {
+        content: '/predict/content',
+        propagation: '/predict/propagation',
+        hybrid: '/predict/hybrid',
+        all: '/predict/all',
+      };
       let requestBody = { text };
 
-      try {
-        const parsed = JSON.parse(graphJson);
-        payload = { ...payload, ...parsed };
-        requestBody = { text, ...parsed };
-      } catch {
-        setError('Propagation data is not valid JSON. Please provide a valid node/edge structure.');
-        setLoading(false);
-        return;
+      if (analysisMode !== 'content') {
+        let graph;
+        try {
+          graph = JSON.parse(graphJson);
+          if (!graph || typeof graph !== 'object' || Array.isArray(graph)) throw new Error();
+        } catch {
+          throw new Error('Propagation data must be a JSON object with nodes and edges.');
+        }
+        requestBody = analysisMode === 'propagation' ? graph : { text, ...graph };
       }
 
-      if (analysisMode === 'content') {
-        endpoint = '/predict/content';
-      } else if (analysisMode === 'propagation') {
-        endpoint = '/predict/propagation';
-      } else if (analysisMode === 'hybrid') {
-        endpoint = '/predict/hybrid';
-      } else {
-        endpoint = '/predict/all';
-      }
-
-      const response = await fetch(`${API_URL}${endpoint}`, {
+      const response = await fetch(`${API_URL}${endpoints[analysisMode]}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(data.detail || 'Request failed');
       }
 
       if (analysisMode === 'all') {
-        const allResult = {
-          content: data.content,
-          propagation: data.propagation,
-          hybrid: data.hybrid,
-        };
-        setResult(allResult);
+        setResult(data);
       } else {
         setResult({ [analysisMode]: data });
       }
 
+      const summary = analysisMode === 'all' ? data.hybrid : data;
       const historyEntry = {
         id: Date.now(),
         mode: analysisMode,
-        label: data.label || 'Unknown',
-        confidence: data.confidence || 0,
+        label: summary?.label || 'Unknown',
+        confidence: summary?.confidence ?? 0,
         text: text.slice(0, 60),
       };
       setHistory((prev) => [historyEntry, ...prev].slice(0, 4));
@@ -106,17 +125,32 @@ function App() {
           <h1>Misinformation Detection System</h1>
           <p className="subtitle">Assess credibility from content and social propagation signals in one place.</p>
         </div>
+        <div className={`api-status ${apiStatus}`} role="status">
+          <span />
+          {apiStatus === 'checking' ? 'Checking API…' : apiStatus === 'online' ? 'API connected' : 'API unavailable'}
+        </div>
       </header>
 
       <section className="grid-layout">
         <div className="card">
+          {apiStatus === 'online' ? (
+            <div className="model-status-list" aria-label="Model availability">
+              {Object.entries(models || {}).map(([name, available]) => (
+                <span key={name} className={available ? 'available' : 'unavailable'} title={modelErrors[name] || undefined}>
+                  {name}: {available ? 'ready' : 'unavailable'}
+                </span>
+              ))}
+            </div>
+          ) : null}
           <div className="mode-switcher">
-            {modes.map((item) => (
-              <button key={item} className={mode === item ? 'active' : ''} onClick={() => setMode(item)}>
+            {modes.map((item) => {
+              const available = models?.[item] !== false;
+              return <button key={item} className={mode === item ? 'active' : ''} onClick={() => setMode(item)} disabled={!available} title={modelErrors[item] || undefined}>
                 {item === 'content' ? 'Content Analysis' : item === 'propagation' ? 'Propagation Analysis' : 'Hybrid (Combined)'}
-              </button>
-            ))}
+              </button>;
+            })}
           </div>
+          {apiStatus === 'online' && modelErrors[mode] ? <p className="model-warning">{modelErrors[mode]}</p> : null}
 
           <label className="field-label">Article or claim</label>
           <textarea
@@ -138,7 +172,7 @@ function App() {
             <button onClick={() => runAnalysis(mode)} disabled={loading || !text.trim()}>
               {loading ? 'Analyzing...' : 'Run Analysis'}
             </button>
-            <button className="secondary" onClick={() => runAnalysis('all')} disabled={loading || !text.trim()}>
+            <button className="secondary" onClick={() => runAnalysis('all')} disabled={loading || !text.trim() || (models && !Object.values(models).every(Boolean))} title={Object.values(modelErrors).join('; ') || undefined}>
               Analyze with All Models
             </button>
           </div>

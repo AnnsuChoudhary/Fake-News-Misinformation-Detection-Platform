@@ -37,7 +37,7 @@ def startup_event() -> None:
 
 @app.get("/health")
 def health() -> Dict[str, Any]:
-    return {"status": "ok", "models": registry.load_all_models()}
+    return {"status": "ok", **registry.model_status()}
 
 
 @app.post("/predict/content", response_model=PredictionResponse)

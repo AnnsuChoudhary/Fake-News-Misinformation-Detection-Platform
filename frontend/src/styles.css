@@ -14,7 +14,7 @@ button, textarea { font: inherit; }
 
 .app-shell { max-width: 1280px; margin: 0 auto; padding: 24px; }
 .hero-card, .card { background: rgba(8, 16, 30, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; box-shadow: 0 20px 45px rgba(0,0,0,0.25); }
-.hero-card { padding: 24px 28px; margin-bottom: 20px; }
+.hero-card { padding: 24px 28px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
 .eyebrow { text-transform: uppercase; letter-spacing: 0.3em; color: #74b9ff; font-size: 0.8rem; margin-bottom: 8px; }
 .hero-card h1 { margin: 0; font-size: 2rem; }
 .subtitle { color: #9fb2d9; margin-top: 8px; }
@@ -22,6 +22,7 @@ button, textarea { font: inherit; }
 .card { padding: 20px; }
 .mode-switcher { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
 .mode-switcher button, .actions button { border: none; border-radius: 999px; padding: 10px 14px; cursor: pointer; color: white; background: #2d456f; transition: background 0.2s ease; }
+.mode-switcher button:disabled, .actions button:disabled { cursor: not-allowed; opacity: 0.45; }
 .mode-switcher button.active, .actions button { background: linear-gradient(135deg, #4c6ef5, #3b82f6); }
 .actions { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
 .actions .secondary { background: #8b5cf6; }
@@ -44,4 +45,14 @@ textarea { width: 100%; border: 1px solid rgba(255,255,255,0.12); border-radius:
 .history-item p { margin: 2px 0 0; color: #9fb2d9; }
 .error-box { margin-top: 12px; padding: 10px 12px; background: rgba(248,113,113,0.12); color: #fecaca; border-radius: 12px; }
 .empty-state { color: #9fb2d9; }
+.api-status { display: flex; align-items: center; gap: 8px; white-space: nowrap; color: #9fb2d9; font-size: 0.9rem; }
+.api-status span { width: 9px; height: 9px; border-radius: 50%; background: #fbbf24; }
+.api-status.online span { background: #4ade80; }
+.api-status.offline span { background: #f87171; }
+.model-status-list { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; font-size: 0.82rem; }
+.model-status-list span { padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.06); }
+.model-status-list .available { color: #7ef0a0; }
+.model-status-list .unavailable, .model-warning { color: #fda4af; }
+.model-warning { margin: -4px 0 12px; font-size: 0.9rem; }
 @media (max-width: 900px) { .grid-layout { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .hero-card { flex-direction: column; } .api-status { white-space: normal; } }
